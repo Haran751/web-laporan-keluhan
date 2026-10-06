@@ -140,7 +140,7 @@ export default function DetailKeluhanPage() {
           {/* Uraian Barang */}
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-kemenkes-700">
-              Barang / Sarana Rusak
+              Fasilitas / Sarana Rusak
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
               {complaint.nama_barang}
@@ -242,6 +242,8 @@ export default function DetailKeluhanPage() {
                     <img
                       src={photo.url}
                       alt={`Bukti kerusakan ${idx + 1}`}
+                      loading={idx === 0 ? 'eager' : 'lazy'}
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">

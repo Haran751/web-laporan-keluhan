@@ -134,7 +134,7 @@ function LoginFormContent() {
             </>
           ) : (
             <>
-              <span>Masuk ke Dashboard</span>
+              <span>Masuk</span>
               <ArrowRight size={18} />
             </>
           )}

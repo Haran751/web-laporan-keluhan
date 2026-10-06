@@ -161,19 +161,24 @@ export default function LaporPage() {
     });
   };
 
-  // Form Validation Check
+  // Form Validation Check — seluruh kolom wajib terpenuhi sebelum tombol kirim aktif.
   const isNipValid = nip.length === 18;
   const hasEnoughPhotos = photos.length >= MIN_PHOTO_COUNT;
+
+  const requirements = [
+    { label: 'Nama lengkap pelapor (min. 2 karakter)', ok: nama.trim().length >= 2 },
+    { label: 'NIP tepat 18 angka', ok: isNipValid },
+    { label: 'Tim kerja / unit organisasi', ok: timKerja.trim().length >= 2 },
+    { label: 'Nama / jenis fasilitas rusak', ok: namaBarang.trim().length >= 2 },
+    { label: 'Lokasi gedung / ruangan', ok: lokasi.trim().length >= 2 },
+    { label: 'Tanggal kejadian / temuan', ok: !!tanggalKeluhan },
+    { label: 'Deskripsi gejala (min. 10 karakter)', ok: deskripsi.trim().length >= 10 },
+    { label: `Foto bukti minimal ${MIN_PHOTO_COUNT} foto`, ok: hasEnoughPhotos },
+  ];
+  const missingRequirements = requirements.filter((r) => !r.ok);
+
   const isFormValid =
-    nama.trim().length >= 2 &&
-    isNipValid &&
-    timKerja.trim().length >= 2 &&
-    namaBarang.trim().length >= 2 &&
-    lokasi.trim().length >= 2 &&
-    deskripsi.trim().length >= 10 &&
-    hasEnoughPhotos &&
-    !isSubmitting &&
-    !isCompressing;
+    missingRequirements.length === 0 && !isSubmitting && !isCompressing;
 
   // Handle Form Submit (Direct-to-Storage with Signed URLs)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,13 +191,14 @@ export default function LaporPage() {
       return;
     }
 
-    if (!isNipValid) {
-      setFormError('NIP harus tepat 18 angka numerik.');
-      return;
-    }
-
-    if (!hasEnoughPhotos) {
-      setFormError(`Wajib mengunggah minimal ${MIN_PHOTO_COUNT} foto bukti kerusakan.`);
+    // Semua kolom wajib dicek ulang di sini agar pengguna mendapat pesan jelas
+    // sebelum proses unggah foto yang mahal dimulai.
+    if (missingRequirements.length > 0) {
+      setFormError(
+        `Laporan belum lengkap. Masih wajib diisi: ${missingRequirements
+          .map((r) => r.label)
+          .join('; ')}.`
+      );
       return;
     }
 
@@ -389,10 +395,10 @@ export default function LaporPage() {
       <div className="mb-8">
         <div className="flex items-center gap-2 text-kemenkes-700 font-bold text-xs uppercase tracking-widest mb-1.5">
           <FileText size={16} />
-          <span>Formulir Pengaduan Sarana Kantor</span>
+          <span>Formulir Pengaduan Kerusakan Fasilitas Kantor</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-          Laporkan Kerusakan Barang
+          Laporkan Kerusakan Fasilitas Kantor
         </h1>
         <p className="mt-2 text-base text-slate-600">
           Sampaikan data kerusakan perlengkapan kantor secara rinci agar petugas dapat menindaklanjuti dengan cepat.
@@ -509,7 +515,7 @@ export default function LaporPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Nama Barang */}
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-bold text-slate-800">Nama / Jenis Barang Rusak *</label>
+              <label className="text-sm font-bold text-slate-800">Nama / Jenis Fasilitas Rusak *</label>
               <input
                 type="text"
                 required
@@ -645,6 +651,7 @@ export default function LaporPage() {
                     <img
                       src={item.previewUrl}
                       alt={`Foto ke-${index + 1}`}
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 text-white font-mono text-xs font-bold">
@@ -678,18 +685,33 @@ export default function LaporPage() {
 
         {/* Tombol Kirim */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-sm text-slate-600">
-            {photos.length < MIN_PHOTO_COUNT ? (
-              <span className="text-amber-700 font-semibold flex items-center gap-1.5">
-                <AlertCircle size={18} />
-                <span>Tambahkan minimal {MIN_PHOTO_COUNT - photos.length} foto lagi untuk mengaktifkan tombol kirim.</span>
-              </span>
-            ) : (
-              <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
-                <CheckCircle2 size={18} />
-                <span>Syarat minimal 3 foto terpenuhi ({photos.length} foto terpilih).</span>
-              </span>
-            )}
+          <div className="text-sm flex-1">
+            <p
+              className={`font-bold mb-2 ${
+                missingRequirements.length === 0 ? 'text-emerald-700' : 'text-amber-700'
+              }`}
+            >
+              {missingRequirements.length === 0
+                ? 'Seluruh kolom wajib sudah terisi. Laporan siap dikirim.'
+                : `Wajib diisi — masih ada ${missingRequirements.length} syarat terpenuhi:`}
+            </p>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1">
+              {requirements.map((req) => (
+                <li
+                  key={req.label}
+                  className={`flex items-center gap-1.5 ${
+                    req.ok ? 'text-emerald-700' : 'text-amber-700 font-semibold'
+                  }`}
+                >
+                  {req.ok ? (
+                    <CheckCircle2 size={15} className="shrink-0" />
+                  ) : (
+                    <AlertCircle size={15} className="shrink-0" />
+                  )}
+                  <span>{req.label}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <button

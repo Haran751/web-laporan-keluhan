@@ -63,7 +63,7 @@ export function downloadComplaintsCsv(records: CsvComplaintRecord[], filename: s
     'Nama Pelapor',
     'NIP Pegawai',
     'Tim Kerja / Unit',
-    'Nama Barang',
+    'Nama Fasilitas',
     'Lokasi / Ruangan',
     'Status',
     'Tanggal Selesai',

@@ -39,16 +39,24 @@ export default function AdminDashboardPage() {
     selesai: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Debounce pencarian 300ms — mencegah satu request API per huruf yang diketik.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Modal Update State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -66,11 +74,11 @@ export default function AdminDashboardPage() {
 
   const fetchAdminComplaints = useCallback(async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       setError(null);
 
       const params = new URLSearchParams();
-      if (search.trim()) params.append('search', search.trim());
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
@@ -94,8 +102,9 @@ export default function AdminDashboardPage() {
       setError(err.message || 'Terjadi kesalahan');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [search, statusFilter, startDate, endDate, page]);
+  }, [debouncedSearch, statusFilter, startDate, endDate, page]);
 
   useEffect(() => {
     fetchAdminComplaints();
@@ -222,7 +231,7 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Dashboard Penanganan Kerusakan
+            Penanganan Pengaduan Kerusakan Fasilitas Kantor
           </h1>
           <p className="text-base text-slate-600 mt-1">
             Pusat kendali, validasi status, dan inventarisasi aduan sarana prasarana dinas.
@@ -379,6 +388,7 @@ export default function AdminDashboardPage() {
               <button
                 onClick={() => {
                   setSearch('');
+                  setDebouncedSearch('');
                   setStatusFilter('all');
                   setStartDate('');
                   setEndDate('');
@@ -401,7 +411,7 @@ export default function AdminDashboardPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <LoadingState message="Memuat Data Admin..." subMessage="Mengambil log laporan dan foto..." />
-        ) : error ? (
+        ) : error && complaints.length === 0 ? (
           <div className="p-8 text-center text-red-600">
             <p className="font-bold">{error}</p>
           </div>
@@ -420,7 +430,7 @@ export default function AdminDashboardPage() {
                     <th className="py-3.5 px-4">Tgl Masuk</th>
                     <th className="py-3.5 px-4">Pelapor &amp; NIP Lengkap</th>
                     <th className="py-3.5 px-4">Unit Kerja</th>
-                    <th className="py-3.5 px-4">Barang Rusak</th>
+                    <th className="py-3.5 px-4">Fasilitas Rusak</th>
                     <th className="py-3.5 px-4">Lokasi</th>
                     <th className="py-3.5 px-4 text-center">Status</th>
                     <th className="py-3.5 px-4">Tgl Selesai</th>

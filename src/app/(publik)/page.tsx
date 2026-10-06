@@ -15,7 +15,8 @@ import {
   Clock,
   Wrench,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
 import { ComplaintPublic, ComplaintStats } from '@/types';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -32,10 +33,12 @@ export default function HomePage() {
     selesai: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter States
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -43,13 +46,20 @@ export default function HomePage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Debounce pencarian 300ms. Tanpa ini setiap huruf yang diketik langsung
+  // memicu satu request API (search jadi dependency dari fetchComplaints).
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const fetchComplaints = useCallback(async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       setError(null);
 
       const params = new URLSearchParams();
-      if (search.trim()) params.append('search', search.trim());
+      if (debouncedSearch.trim()) params.append('search', debouncedSearch.trim());
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
@@ -74,8 +84,9 @@ export default function HomePage() {
       setError(err.message || 'Terjadi kesalahan jaringan.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [search, statusFilter, startDate, endDate, page]);
+  }, [debouncedSearch, statusFilter, startDate, endDate, page]);
 
   useEffect(() => {
     fetchComplaints();
@@ -83,6 +94,7 @@ export default function HomePage() {
 
   const handleResetFilters = () => {
     setSearch('');
+    setDebouncedSearch('');
     setStatusFilter('all');
     setStartDate('');
     setEndDate('');
@@ -92,7 +104,8 @@ export default function HomePage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    fetchComplaints();
+    // Flush debounce langsung, tanpa memicu fetch kedua.
+    setDebouncedSearch(search);
   };
 
   return (
@@ -101,14 +114,8 @@ export default function HomePage() {
       <section className="w-full bg-gradient-to-r from-kemenkes-900 via-kemenkes-800 to-kemenkes-700 text-white py-12 px-4 sm:px-6 lg:px-8 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-8">
           <div className="flex flex-col gap-3 max-w-2xl">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-kemenkes-400 animate-pulse"></span>
-              <span className="text-xs font-bold tracking-widest text-kemenkes-300 uppercase">
-                Portal Transparansi Layanan Fasilitas
-              </span>
-            </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight">
-              Daftar Kerusakan Barang Kantor
+              Daftar Pengaduan Kerusakan Fasilitas Kantor
             </h1>
             <p className="text-base sm:text-lg text-teal-50 leading-relaxed font-normal">
               Pantau status penanganan dan tindak lanjut perbaikan sarana prasarana kerja aparatur secara terpadu.
@@ -295,9 +302,16 @@ export default function HomePage() {
 
       {/* 4. Daftar Laporan (Tabel Desktop & Kartu Mobile) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        {/* Refresh ringan: data lama tetap tampil, tidak diganti skeleton penuh */}
+        {refreshing && !loading && (
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-kemenkes-700">
+            <Loader2 size={15} className="animate-spin" />
+            <span>Memperbarui data...</span>
+          </div>
+        )}
         {loading ? (
           <LoadingState message="Memuat Data Pengaduan..." subMessage="Menghubungkan ke basis data..." />
-        ) : error ? (
+        ) : error && complaints.length === 0 ? (
           <div className="p-8 text-center bg-red-50 border border-red-200 rounded-2xl text-red-800">
             <AlertCircle size={36} className="mx-auto mb-2 text-red-600" />
             <h3 className="text-lg font-bold">Terjadi Kesalahan</h3>
@@ -327,7 +341,7 @@ export default function HomePage() {
                     <th className="py-4 px-5">Tgl Keluhan</th>
                     <th className="py-4 px-5">Pelapor &amp; NIP</th>
                     <th className="py-4 px-5">Tim Kerja</th>
-                    <th className="py-4 px-5">Barang Rusak</th>
+                    <th className="py-4 px-5">Fasilitas Rusak</th>
                     <th className="py-4 px-5">Lokasi</th>
                     <th className="py-4 px-5 text-center">Status</th>
                     <th className="py-4 px-5">Tgl Selesai</th>

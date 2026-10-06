@@ -32,14 +32,14 @@ export function Navbar() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 uppercase">
-                  SiPeKa
+                  PADUKA
                 </span>
                 <span className="px-2 py-0.5 text-xs font-bold uppercase tracking-wider rounded bg-kemenkes-100 text-kemenkes-900 border border-kemenkes-300">
                   Resmi
                 </span>
               </div>
               <span className="text-xs sm:text-sm text-slate-600 font-medium hidden sm:inline-block">
-                Pengaduan Kerusakan Barang Kantor
+                Pengaduan Kerusakan Fasilitas Kantor
               </span>
             </div>
           </Link>

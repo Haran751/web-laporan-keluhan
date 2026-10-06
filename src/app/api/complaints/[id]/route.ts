@@ -32,36 +32,24 @@ async function verifyAdminSession() {
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
-    const { isAuthorized } = await verifyAdminSession();
     const supabase = createServerSupabase();
 
-    let complaint: any = null;
+    // Selalu pakai view complaints_public agar NIP tampil disamarkan tanpa
+    // tergantung status login. Sebelumnya endpoint ini mengembalikan NIP
+    // lengkap apabila browser pemanggil memiliki sesi admin, sehingga halaman
+    // rincian publik ikut menampilkan NIP utuh. NIP lengkap tetap tersedia
+    // bagi petugas melalui /api/admin/complaints.
+    const { data, error } = await supabase
+      .from('complaints_public')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (isAuthorized) {
-      // Admin: Ambil NIP lengkap dari tabel complaints
-      const { data, error } = await supabase
-        .from('complaints')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error || !data) {
-        return NextResponse.json({ error: 'Keluhan tidak ditemukan' }, { status: 404 });
-      }
-      complaint = data;
-    } else {
-      // Publik: Ambil NIP disamarkan dari view complaints_public
-      const { data, error } = await supabase
-        .from('complaints_public')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error || !data) {
-        return NextResponse.json({ error: 'Keluhan tidak ditemukan' }, { status: 404 });
-      }
-      complaint = data;
+    if (error || !data) {
+      return NextResponse.json({ error: 'Keluhan tidak ditemukan' }, { status: 404 });
     }
+
+    const complaint = data;
 
     // Ambil foto-foto keluhan
     const { data: photos } = await supabase

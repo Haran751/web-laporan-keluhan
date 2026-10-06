@@ -9,7 +9,7 @@ export function Footer() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xl font-black tracking-tight text-white uppercase">
-                SiPeKa
+                PADUKA
               </span>
               <span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-kemenkes-900 text-kemenkes-400 border border-kemenkes-700">
                 Fasilitas Kantor
