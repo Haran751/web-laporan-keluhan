@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Lock, Mail, Building2, ArrowRight, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, Building2, ArrowRight, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 function LoginFormContent() {
   const router = useRouter();
@@ -13,6 +13,7 @@ function LoginFormContent() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -112,14 +113,25 @@ function LoginFormContent() {
             <Lock size={16} className="text-kemenkes-700" />
             <span>Kata Sandi (Password)</span>
           </label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500 focus:border-transparent transition"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-300 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500 focus:border-transparent transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+              title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+              className="absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400 hover:text-kemenkes-700 transition"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
         </div>
 
         <button

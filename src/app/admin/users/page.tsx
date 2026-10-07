@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Loader2,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AdminUser } from '@/types';
 import { formatDate } from '@/lib/utils';
@@ -29,6 +31,7 @@ export default function AdminUsersPage() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -103,6 +106,7 @@ export default function AdminUsersPage() {
       setFormSuccess('Admin baru berhasil dibuat dan didaftarkan.');
       setNewEmail('');
       setNewPassword('');
+      setShowNewPassword(false);
       setTimeout(() => {
         setAddModalOpen(false);
         setFormSuccess(null);
@@ -164,6 +168,7 @@ export default function AdminUsersPage() {
           onClick={() => {
             setFormError(null);
             setFormSuccess(null);
+            setShowNewPassword(false);
             setAddModalOpen(true);
           }}
           className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-kemenkes-900 hover:bg-kemenkes-800 text-white font-bold text-sm shadow-md transition"
@@ -299,15 +304,26 @@ export default function AdminUsersPage() {
                   <Lock size={16} className="text-kemenkes-700" />
                   <span>Kata Sandi (Min. 8 Karakter)</span>
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minimal 8 karakter unik"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minimal 8 karakter unik"
+                    className="w-full px-4 py-2.5 pr-11 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    aria-label={showNewPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    title={showNewPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-kemenkes-700 transition"
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 mt-2">
