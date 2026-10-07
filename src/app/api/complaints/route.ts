@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { createComplaintSchema } from '@/lib/validations';
+import { cariPegawai } from '@/lib/pegawai';
 import { checkRateLimit, recordRateLimitHit, getClientIp } from '@/lib/rate-limiter';
 
 // GET: Mengambil daftar laporan publik (NIP otomatis disamarkan melalui view complaints_public)
@@ -145,8 +146,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { nama, nip, tim_kerja, nama_barang, lokasi, deskripsi, tanggal_keluhan, photos } =
-      parsed.data;
+    const { nama, nip, nama_barang, lokasi, deskripsi, tanggal_keluhan, photos } = parsed.data;
+
+    // Tim kerja ditentukan otomatis dari master data pegawai (server-authoritative)
+    const pegawai = cariPegawai(nip);
+    if (!pegawai) {
+      return NextResponse.json(
+        { error: 'Nama dan NIP tidak sesuai dengan data pegawai resmi' },
+        { status: 400 }
+      );
+    }
+    const timKerjaResmi = pegawai.timKerja;
 
     // Pastikan foto minimal 3
     if (photos.length < 3) {
@@ -164,7 +174,7 @@ export async function POST(req: NextRequest) {
       .insert({
         nama,
         nip,
-        tim_kerja,
+        tim_kerja: timKerjaResmi,
         nama_barang,
         lokasi,
         deskripsi,

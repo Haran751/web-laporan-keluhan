@@ -36,41 +36,40 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const signedUrls = [];
 
-    for (const file of parsed.data.files) {
-      // Buat nama berkas acak yang aman dengan ekstensi asli
-      const ext = file.filename.split('.').pop()?.toLowerCase() || 'jpg';
-      const cleanExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
-      const randomId = crypto.randomUUID();
-      const storagePath = `complaints/${Date.now()}-${randomId}.${cleanExt}`;
+    // Buat seluruh signed upload URL secara PARALEL agar respons lebih cepat.
+    const signedUrls = await Promise.all(
+      parsed.data.files.map(async (file) => {
+        // Buat nama berkas acak yang aman dengan ekstensi asli
+        const ext = file.filename.split('.').pop()?.toLowerCase() || 'jpg';
+        const cleanExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
+        const randomId = crypto.randomUUID();
+        const storagePath = `complaints/${Date.now()}-${randomId}.${cleanExt}`;
 
-      // Buat signed upload URL yang berlaku 15 menit
-      const { data, error } = await supabase.storage
-        .from('complaint-photos')
-        .createSignedUploadUrl(storagePath);
+        // Buat signed upload URL yang berlaku 15 menit
+        const { data, error } = await supabase.storage
+          .from('complaint-photos')
+          .createSignedUploadUrl(storagePath);
 
-      if (error || !data) {
-        console.error('Error creating signed upload URL:', error);
-        return NextResponse.json(
-          { error: `Gagal mempersiapkan jalur upload untuk ${file.filename}` },
-          { status: 500 }
-        );
-      }
+        if (error || !data) {
+          console.error('Error creating signed upload URL:', error);
+          throw new Error(`Gagal mempersiapkan jalur upload untuk ${file.filename}`);
+        }
 
-      // Dapatkan URL publik untuk referensi tampilan gambar
-      const { data: publicUrlData } = supabase.storage
-        .from('complaint-photos')
-        .getPublicUrl(storagePath);
+        // Dapatkan URL publik untuk referensi tampilan gambar
+        const { data: publicUrlData } = supabase.storage
+          .from('complaint-photos')
+          .getPublicUrl(storagePath);
 
-      signedUrls.push({
-        originalName: file.filename,
-        storagePath: storagePath,
-        signedUrl: data.signedUrl,
-        token: data.token,
-        publicUrl: publicUrlData.publicUrl,
-      });
-    }
+        return {
+          originalName: file.filename,
+          storagePath: storagePath,
+          signedUrl: data.signedUrl,
+          token: data.token,
+          publicUrl: publicUrlData.publicUrl,
+        };
+      })
+    );
 
     return NextResponse.json({
       success: true,

@@ -9,6 +9,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Copy,
   Check,
   ArrowRight,
@@ -24,6 +25,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { ALLOWED_PHOTO_TYPES, MIN_PHOTO_COUNT, MAX_PHOTO_COUNT } from '@/lib/validations';
+import { validasiPegawai } from '@/lib/pegawai';
 
 interface PhotoItem {
   id: string;
@@ -53,6 +55,7 @@ export default function LaporPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [photoWarning, setPhotoWarning] = useState<string | null>(null);
 
   // Success Confirmation State
   const [submittedData, setSubmittedData] = useState<{
@@ -64,12 +67,32 @@ export default function LaporPage() {
   const [copied, setCopied] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const namaRef = useRef<HTMLInputElement>(null);
+  const nipRef = useRef<HTMLInputElement>(null);
+  const timKerjaRef = useRef<HTMLInputElement>(null);
+  const namaBarangRef = useRef<HTMLInputElement>(null);
+  const lokasiRef = useRef<HTMLInputElement>(null);
+  const tanggalRef = useRef<HTMLInputElement>(null);
+  const deskripsiRef = useRef<HTMLTextAreaElement>(null);
+  const photosSectionRef = useRef<HTMLDivElement>(null);
 
   // Set default date to today
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     setTanggalKeluhan(today);
   }, []);
+
+  // Verifikasi identitas pelapor terhadap master data pegawai resmi
+  const identitas = validasiPegawai(nama, nip);
+
+  // Isi otomatis Tim Kerja saat Nama & NIP terverifikasi; kosongkan bila tidak
+  useEffect(() => {
+    if (identitas.status === 'valid' && identitas.timKerja) {
+      setTimKerja(identitas.timKerja);
+    } else {
+      setTimKerja('');
+    }
+  }, [identitas.status, identitas.timKerja]);
 
   // Handle NIP input: allow digits only, max 18
   const handleNipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,29 +114,41 @@ export default function LaporPage() {
     if (!selectedFiles || selectedFiles.length === 0) return;
 
     setFormError(null);
-    const newPhotos: PhotoItem[] = [];
+    setPhotoWarning(null);
 
-    // Validasi kuota foto
-    if (photos.length + selectedFiles.length > MAX_PHOTO_COUNT) {
-      setFormError(`Maksimal berkas foto yang diizinkan adalah ${MAX_PHOTO_COUNT} foto.`);
+    const incoming = Array.from(selectedFiles);
+    const remainingSlots = MAX_PHOTO_COUNT - photos.length;
+
+    // Peringatan: kuota maksimal sudah penuh
+    if (remainingSlots <= 0) {
+      setPhotoWarning(
+        `Jumlah foto sudah mencapai batas maksimal ${MAX_PHOTO_COUNT}. Hapus salah satu foto terlebih dahulu untuk menambah yang baru.`
+      );
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
+
+    // Bila berkas yang dipilih melebihi kapasitas, ambil sejumlah slot yang tersisa saja
+    const accepted = incoming.slice(0, remainingSlots);
+    const skippedByQuota = incoming.length - accepted.length;
+
+    const newPhotos: PhotoItem[] = [];
+    let rejectedType = 0;
+    let rejectedSize = 0;
 
     setIsCompressing(true);
 
     try {
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-
+      for (const file of accepted) {
         // Validasi tipe berkas
         if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
-          setFormError(`Berkas "${file.name}" tidak didukung. Format wajib: JPG, PNG, atau WEBP.`);
+          rejectedType += 1;
           continue;
         }
 
         // Validasi ukuran maks 5MB sebelum kompres
         if (file.size > 5 * 1024 * 1024) {
-          setFormError(`Berkas "${file.name}" melebihi batas 5MB sebelum kompresi.`);
+          rejectedSize += 1;
           continue;
         }
 
@@ -140,9 +175,28 @@ export default function LaporPage() {
       }
 
       setPhotos((prev) => [...prev, ...newPhotos].slice(0, MAX_PHOTO_COUNT));
+
+      // Susun pesan peringatan bila ada berkas yang tidak diterima
+      const warnings: string[] = [];
+      if (skippedByQuota > 0) {
+        warnings.push(
+          `${skippedByQuota} foto tidak ditambahkan karena melebihi batas maksimal ${MAX_PHOTO_COUNT} foto.`
+        );
+      }
+      if (rejectedType > 0) {
+        warnings.push(
+          `${rejectedType} berkas diabaikan karena formatnya tidak didukung (hanya JPG, PNG, atau WEBP).`
+        );
+      }
+      if (rejectedSize > 0) {
+        warnings.push(`${rejectedSize} berkas diabaikan karena melebihi batas 5MB.`);
+      }
+      if (warnings.length > 0) {
+        setPhotoWarning(warnings.join(' '));
+      }
     } catch (err: any) {
       console.error('Compression error:', err);
-      setFormError('Gagal mengompresi gambar. Coba pilih berkas foto lain.');
+      setPhotoWarning('Gagal mengompresi gambar. Coba pilih berkas foto lain.');
     } finally {
       setIsCompressing(false);
       if (fileInputRef.current) {
@@ -152,6 +206,7 @@ export default function LaporPage() {
   };
 
   const removePhoto = (id: string) => {
+    setPhotoWarning(null);
     setPhotos((prev) => {
       const removed = prev.find((p) => p.id === id);
       if (removed) {
@@ -161,24 +216,54 @@ export default function LaporPage() {
     });
   };
 
-  // Form Validation Check — seluruh kolom wajib terpenuhi sebelum tombol kirim aktif.
+  // Form Validation Check — seluruh kolom wajib terpenuhi sebelum laporan dapat dikirim.
   const isNipValid = nip.length === 18;
+  const isIdentitasValid = identitas.status === 'valid';
   const hasEnoughPhotos = photos.length >= MIN_PHOTO_COUNT;
 
-  const requirements = [
-    { label: 'Nama lengkap pelapor (min. 2 karakter)', ok: nama.trim().length >= 2 },
-    { label: 'NIP tepat 18 angka', ok: isNipValid },
-    { label: 'Tim kerja / unit organisasi', ok: timKerja.trim().length >= 2 },
-    { label: 'Nama / jenis fasilitas rusak', ok: namaBarang.trim().length >= 2 },
-    { label: 'Lokasi gedung / ruangan', ok: lokasi.trim().length >= 2 },
-    { label: 'Tanggal kejadian / temuan', ok: !!tanggalKeluhan },
-    { label: 'Deskripsi gejala (min. 10 karakter)', ok: deskripsi.trim().length >= 10 },
-    { label: `Foto bukti minimal ${MIN_PHOTO_COUNT} foto`, ok: hasEnoughPhotos },
+  // Setiap syarat dipetakan ke elemen terkait agar bisa di-scroll otomatis saat ada yang kurang.
+  const requirements: {
+    label: string;
+    ok: boolean;
+    ref: React.RefObject<HTMLElement>;
+  }[] = [
+    { label: 'Nama lengkap pelapor (min. 2 karakter)', ok: nama.trim().length >= 2, ref: namaRef },
+    { label: 'NIP tepat 18 angka', ok: isNipValid, ref: nipRef },
+    { label: 'Nama & NIP sesuai data pegawai', ok: isIdentitasValid, ref: nipRef },
+    {
+      label: 'Tim kerja / unit organisasi (otomatis)',
+      ok: timKerja.trim().length >= 2,
+      ref: timKerjaRef,
+    },
+    { label: 'Nama / jenis fasilitas rusak', ok: namaBarang.trim().length >= 2, ref: namaBarangRef },
+    { label: 'Lokasi gedung / ruangan', ok: lokasi.trim().length >= 2, ref: lokasiRef },
+    { label: 'Tanggal kejadian / temuan', ok: !!tanggalKeluhan, ref: tanggalRef },
+    { label: 'Deskripsi gejala (min. 10 karakter)', ok: deskripsi.trim().length >= 10, ref: deskripsiRef },
+    { label: `Foto bukti minimal ${MIN_PHOTO_COUNT} foto`, ok: hasEnoughPhotos, ref: photosSectionRef },
   ];
   const missingRequirements = requirements.filter((r) => !r.ok);
 
-  const isFormValid =
-    missingRequirements.length === 0 && !isSubmitting && !isCompressing;
+  // Gulir otomatis ke kolom pertama yang belum lengkap dan fokuskan bila berupa input.
+  const scrollToFirstMissing = () => {
+    const first = missingRequirements[0];
+    if (!first) return;
+    const el = first.ref.current;
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    if (
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement
+    ) {
+      el.focus({ preventScroll: true });
+    } else {
+      // Untuk area foto (non-input), beri sorotan singkat agar mudah ditemukan.
+      el.classList.add('ring-2', 'ring-amber-400', 'rounded-2xl');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-amber-400'), 2200);
+    }
+  };
 
   // Handle Form Submit (Direct-to-Storage with Signed URLs)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,14 +276,10 @@ export default function LaporPage() {
       return;
     }
 
-    // Semua kolom wajib dicek ulang di sini agar pengguna mendapat pesan jelas
-    // sebelum proses unggah foto yang mahal dimulai.
+    // Bila masih ada kolom kurang, arahkan (scroll) otomatis ke bagian tersebut.
     if (missingRequirements.length > 0) {
-      setFormError(
-        `Laporan belum lengkap. Masih wajib diisi: ${missingRequirements
-          .map((r) => r.label)
-          .join('; ')}.`
-      );
+      setFormError('Laporan belum lengkap. Formulir diarahkan otomatis ke bagian yang masih perlu dilengkapi.');
+      scrollToFirstMissing();
       return;
     }
 
@@ -234,32 +315,40 @@ export default function LaporPage() {
       // LANGKAH 2: Upload Langsung ke Supabase Storage via Signed URL
       // (Bypass Vercel body limit 4.5MB)
       // -------------------------------------------------------------
-      const finalUploadedPhotos: { storage_path: string; url: string }[] = [];
+      // Unggah semua foto secara PARALEL agar jauh lebih cepat.
+      // Sebelumnya berurutan, sehingga total waktu = jumlah foto x waktu per foto.
+      const finalUploadedPhotos: { storage_path: string; url: string }[] = new Array(
+        photos.length
+      );
+      let uploadedCount = 0;
 
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        const signedTarget = signedDataList[i];
-        setUploadProgress(`Mengunggah foto ${i + 1} dari ${photos.length}...`);
+      await Promise.all(
+        photos.map(async (photo, i) => {
+          const signedTarget = signedDataList[i];
 
-        // Unggah langsung berkas biner ke Supabase Storage menggunakan PUT
-        const uploadRes = await fetch(signedTarget.signedUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': photo.compressedFile.type,
-          },
-          body: photo.compressedFile,
-        });
+          // Unggah langsung berkas biner ke Supabase Storage menggunakan PUT
+          const uploadRes = await fetch(signedTarget.signedUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': photo.compressedFile.type,
+            },
+            body: photo.compressedFile,
+          });
 
-        if (!uploadRes.ok) {
-          throw new Error(`Gagal mengunggah foto ke-${i + 1} (${photo.file.name})`);
-        }
+          if (!uploadRes.ok) {
+            throw new Error(`Gagal mengunggah foto ke-${i + 1} (${photo.file.name})`);
+          }
 
-        uploadedPaths.push(signedTarget.storagePath);
-        finalUploadedPhotos.push({
-          storage_path: signedTarget.storagePath,
-          url: signedTarget.publicUrl,
-        });
-      }
+          uploadedPaths.push(signedTarget.storagePath);
+          finalUploadedPhotos[i] = {
+            storage_path: signedTarget.storagePath,
+            url: signedTarget.publicUrl,
+          };
+
+          uploadedCount += 1;
+          setUploadProgress(`Mengunggah foto ${uploadedCount} dari ${photos.length}...`);
+        })
+      );
 
       // -------------------------------------------------------------
       // LANGKAH 3: Simpan Data Laporan & Referensi Foto ke Server
@@ -415,7 +504,7 @@ export default function LaporPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
         {/* Anti-Bot Honeypot Field (Tersembunyi) */}
         <div className="hidden" aria-hidden="true">
           <label htmlFor="website_url">Website (Jangan diisi)</label>
@@ -447,11 +536,12 @@ export default function LaporPage() {
                 <span>Nama Lengkap Pelapor *</span>
               </label>
               <input
+                ref={namaRef}
                 type="text"
                 required
                 value={nama}
                 onChange={(e) => setNama(e.target.value)}
-                placeholder="Contoh: Budi Santoso, S.T."
+                placeholder="Contoh: Andi Wijaya"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500 focus:border-transparent transition"
               />
             </div>
@@ -472,12 +562,13 @@ export default function LaporPage() {
                 </span>
               </div>
               <input
+                ref={nipRef}
                 type="text"
                 required
                 maxLength={18}
                 value={nip}
                 onChange={handleNipChange}
-                placeholder="Contoh: 198904122014021003"
+                placeholder="Contoh: 123456789123456789"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500 focus:border-transparent transition"
               />
               <p className="text-xs text-slate-500">
@@ -486,20 +577,53 @@ export default function LaporPage() {
             </div>
           </div>
 
-          {/* Tim Kerja */}
+          {/* Status Verifikasi Identitas Pegawai */}
+          {nip.length === 18 && nama.trim().length >= 2 && (
+            <div
+              className={`flex items-start gap-2.5 p-3.5 rounded-xl border text-sm ${
+                identitas.status === 'valid'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}
+            >
+              {identitas.status === 'valid' ? (
+                <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              )}
+              <span>{identitas.message}</span>
+            </div>
+          )}
+
+          {/* Tim Kerja (otomatis dari data pegawai) */}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
               <Building size={16} className="text-kemenkes-700" />
-              <span>Tim Kerja / Bagian / Unit Organisasi *</span>
+              <span>Tim Kerja / Bagian / Unit Organisasi</span>
+              <span className="px-2 py-0.5 rounded-full bg-kemenkes-100 text-kemenkes-900 text-[10px] font-bold uppercase tracking-wider border border-kemenkes-200">
+                Otomatis
+              </span>
             </label>
-            <input
-              type="text"
-              required
-              value={timKerja}
-              onChange={(e) => setTimKerja(e.target.value)}
-              placeholder="Contoh: Tim Kerja Sarana Prasarana / Biro Umum"
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-kemenkes-500 focus:border-transparent transition"
-            />
+            <div className="relative">
+              <input
+                ref={timKerjaRef}
+                type="text"
+                readOnly
+                value={timKerja}
+                placeholder="Terisi otomatis setelah Nama & NIP terverifikasi"
+                className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-300 text-base text-slate-900 bg-slate-50 cursor-not-allowed focus:outline-none transition"
+              />
+              <span className="absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+                {isIdentitasValid ? (
+                  <CheckCircle2 size={18} className="text-emerald-600" />
+                ) : (
+                  <ShieldCheck size={18} />
+                )}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Terisi otomatis dari <strong>data pegawai resmi</strong> berdasarkan NIP &amp; nama yang terverifikasi.
+            </p>
           </div>
         </div>
 
@@ -517,6 +641,7 @@ export default function LaporPage() {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-bold text-slate-800">Nama / Jenis Fasilitas Rusak *</label>
               <input
+                ref={namaBarangRef}
                 type="text"
                 required
                 value={namaBarang}
@@ -533,6 +658,7 @@ export default function LaporPage() {
                 <span>Lokasi Gedung / Ruangan *</span>
               </label>
               <input
+                ref={lokasiRef}
                 type="text"
                 required
                 value={lokasi}
@@ -551,6 +677,7 @@ export default function LaporPage() {
                 <span>Tanggal Kejadian / Temuan *</span>
               </label>
               <input
+                ref={tanggalRef}
                 type="date"
                 required
                 value={tanggalKeluhan}
@@ -570,6 +697,7 @@ export default function LaporPage() {
               <span className="text-xs text-slate-400">Minimal 10 karakter</span>
             </div>
             <textarea
+              ref={deskripsiRef}
               required
               rows={4}
               value={deskripsi}
@@ -581,7 +709,10 @@ export default function LaporPage() {
         </div>
 
         {/* Bagian 3: Unggah Foto Kerusakan (Wajib 3-6 Foto) */}
-        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6">
+        <div
+          ref={photosSectionRef}
+          className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6"
+        >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <span className="w-8 h-8 rounded-lg bg-kemenkes-100 text-kemenkes-900 font-black flex items-center justify-center text-sm">
@@ -608,6 +739,45 @@ export default function LaporPage() {
             </p>
           </div>
 
+          {/* Notifikasi jumlah foto */}
+          {photoWarning && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+              <span>{photoWarning}</span>
+            </div>
+          )}
+
+          {photos.length > 0 && photos.length < MIN_PHOTO_COUNT && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+              <span>
+                Foto bukti <strong>kurang dari minimal {MIN_PHOTO_COUNT}</strong>. Anda baru
+                menambahkan {photos.length} foto — tambahkan {MIN_PHOTO_COUNT - photos.length} foto
+                lagi.
+              </span>
+            </div>
+          )}
+
+          {photos.length >= MIN_PHOTO_COUNT && photos.length < MAX_PHOTO_COUNT && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+              <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
+              <span>
+                Jumlah foto sudah memenuhi syarat ({photos.length}/{MAX_PHOTO_COUNT}). Anda masih bisa
+                menambah {MAX_PHOTO_COUNT - photos.length} foto lagi.
+              </span>
+            </div>
+          )}
+
+          {photos.length >= MAX_PHOTO_COUNT && (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 text-sm">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <span>
+                Sudah mencapai batas maksimal <strong>{MAX_PHOTO_COUNT} foto</strong>. Hapus salah satu
+                foto untuk menggantinya.
+              </span>
+            </div>
+          )}
+
           {/* Area Drop Zone Upload */}
           <div
             onClick={() => fileInputRef.current?.click()}
@@ -628,7 +798,7 @@ export default function LaporPage() {
               Pilih atau Tarik Berkas Foto ke Sini
             </p>
             <p className="text-sm text-slate-500 mt-1">
-              Format: JPG, PNG, WEBP • Maks 5MB per berkas • Wajib minimal 3 foto
+              Format: JPG, PNG, WEBP • Maks 5MB per berkas • Wajib {MIN_PHOTO_COUNT}–{MAX_PHOTO_COUNT} foto
             </p>
           </div>
 
@@ -684,43 +854,14 @@ export default function LaporPage() {
         </div>
 
         {/* Tombol Kirim */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-          <div className="text-sm flex-1">
-            <p
-              className={`font-bold mb-2 ${
-                missingRequirements.length === 0 ? 'text-emerald-700' : 'text-amber-700'
-              }`}
-            >
-              {missingRequirements.length === 0
-                ? 'Seluruh kolom wajib sudah terisi. Laporan siap dikirim.'
-                : `Wajib diisi — masih ada ${missingRequirements.length} syarat terpenuhi:`}
-            </p>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1">
-              {requirements.map((req) => (
-                <li
-                  key={req.label}
-                  className={`flex items-center gap-1.5 ${
-                    req.ok ? 'text-emerald-700' : 'text-amber-700 font-semibold'
-                  }`}
-                >
-                  {req.ok ? (
-                    <CheckCircle2 size={15} className="shrink-0" />
-                  ) : (
-                    <AlertCircle size={15} className="shrink-0" />
-                  )}
-                  <span>{req.label}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
+        <div className="flex justify-center sm:justify-end p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
           <button
             type="submit"
-            disabled={!isFormValid}
+            disabled={isSubmitting || isCompressing}
             className={`w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl text-base font-black uppercase tracking-wider transition-all shadow-md ${
-              isFormValid
-                ? 'bg-kemenkes-900 hover:bg-kemenkes-800 text-white hover:scale-[1.02] active:scale-[0.98]'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              isSubmitting || isCompressing
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : 'bg-kemenkes-900 hover:bg-kemenkes-800 text-white hover:scale-[1.02] active:scale-[0.98]'
             }`}
           >
             {isSubmitting ? (
