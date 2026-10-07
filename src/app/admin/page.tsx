@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   FileSpreadsheet,
-  Download,
+  FileText,
+  FileType2,
   Search,
   Calendar,
   RotateCcw,
@@ -28,7 +29,8 @@ import { ComplaintAdmin, ComplaintStats, ComplaintStatus } from '@/types';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
-import { formatDate, downloadComplaintsCsv } from '@/lib/utils';
+import { formatDate, downloadComplaintsCsv, todayJakartaISO, type CsvComplaintRecord } from '@/lib/utils';
+import { downloadComplaintsWord, downloadComplaintsPdf } from '@/lib/report-export';
 
 export default function AdminDashboardPage() {
   const [complaints, setComplaints] = useState<ComplaintAdmin[]>([]);
@@ -41,6 +43,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<'csv' | 'word' | 'pdf' | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -125,8 +128,7 @@ export default function AdminDashboardPage() {
     setEditStatus(newStatus);
     if (newStatus === 'selesai' && !editTanggalSelesai) {
       // Otomatis: jika status diubah ke Selesai dan tanggal selesai kosong, isi hari ini
-      const today = new Date().toISOString().split('T')[0];
-      setEditTanggalSelesai(today);
+      setEditTanggalSelesai(todayJakartaISO());
     } else if (newStatus !== 'selesai' && editTanggalSelesai) {
       setEditTanggalSelesai('');
     }
@@ -199,14 +201,9 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Ekspor CSV
-  const handleExportCsv = () => {
-    if (complaints.length === 0) {
-      alert('Tidak ada data yang dapat diekspor sesuai saringan saat ini.');
-      return;
-    }
-
-    const exportData = complaints.map((c) => ({
+  // Ekspor Laporan (Excel CSV, Word DOCX, PDF)
+  const buildExportRecords = (): CsvComplaintRecord[] =>
+    complaints.map((c) => ({
       nomor_laporan: c.nomor_laporan,
       tanggal_keluhan: c.tanggal_keluhan,
       nama: c.nama,
@@ -221,8 +218,27 @@ export default function AdminDashboardPage() {
       foto_urls: (c.photos || []).map((p) => p.url).join(' ; '),
     }));
 
-    const filename = `arsip-kerusakan-bmn-${new Date().toISOString().split('T')[0]}.csv`;
-    downloadComplaintsCsv(exportData, filename);
+  const handleExport = async (type: 'csv' | 'word' | 'pdf') => {
+    if (complaints.length === 0) {
+      alert('Tidak ada data yang dapat diekspor sesuai saringan saat ini.');
+      return;
+    }
+
+    setExporting(type);
+    try {
+      const exportData = buildExportRecords();
+      const base = `arsip-kerusakan-bmn-${todayJakartaISO()}`;
+
+      if (type === 'csv') {
+        downloadComplaintsCsv(exportData, `${base}.csv`);
+      } else if (type === 'word') {
+        await downloadComplaintsWord(exportData, `${base}.docx`);
+      } else {
+        await downloadComplaintsPdf(exportData, `${base}.pdf`);
+      }
+    } finally {
+      setExporting(null);
+    }
   };
 
   return (
@@ -238,15 +254,33 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        {/* Tombol Ekspor CSV */}
-        <button
-          onClick={handleExportCsv}
-          disabled={complaints.length === 0}
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-kemenkes-900 hover:bg-kemenkes-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Download size={18} className="text-kemenkes-lime" />
-          <span>Ekspor CSV (Excel UTF-8)</span>
-        </button>
+        {/* Tombol Ekspor Laporan */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={complaints.length === 0 || exporting !== null}
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-kemenkes-900 hover:bg-kemenkes-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileSpreadsheet size={18} className="text-kemenkes-lime" />
+            <span>{exporting === 'csv' ? 'Menyiapkan...' : 'Excel (CSV)'}</span>
+          </button>
+          <button
+            onClick={() => handleExport('word')}
+            disabled={complaints.length === 0 || exporting !== null}
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-kemenkes-900 hover:bg-kemenkes-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileType2 size={18} className="text-sky-300" />
+            <span>{exporting === 'word' ? 'Menyiapkan...' : 'Word (DOCX)'}</span>
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={complaints.length === 0 || exporting !== null}
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-kemenkes-900 hover:bg-kemenkes-800 text-white font-bold text-sm shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText size={18} className="text-rose-300" />
+            <span>{exporting === 'pdf' ? 'Menyiapkan...' : 'PDF'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Grid Statistik */}

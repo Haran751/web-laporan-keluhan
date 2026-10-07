@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SCHEMA SISTEM PENGADUAN KERUSAKAN BARANG KANTOR (SiPeKa)
+-- SCHEMA SISTEM PENGADUAN KERUSAKAN FASILITAS KANTOR (PADUKA)
 -- Kemenkes Aesthetic Modern Office Equipment Complaint Management System
 -- ==============================================================================
 

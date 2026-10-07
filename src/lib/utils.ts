@@ -29,6 +29,28 @@ export function formatDate(dateStr: string | null | undefined, includeTime: bool
   }
 }
 
+/**
+ * Tanggal hari ini dalam zona waktu Asia/Jakarta (UTC+7) format YYYY-MM-DD.
+ * Penting: tidak memakai toISOString() yang berbasis UTC — di WIB setelah
+ * sekitar pukul 19.00, tanggal UTC sudah berjalan maju satu hari.
+ */
+export function todayJakartaISO(): string {
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
 export function maskNip(nip: string): string {
   if (!nip) return '-';
   const clean = nip.replace(/\D/g, '');

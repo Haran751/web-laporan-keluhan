@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
-import Image from 'next/image';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ComplaintPhoto } from '@/types';
 
 interface PhotoLightboxProps {
@@ -25,17 +24,18 @@ export function PhotoLightbox({
   }, [initialIndex, isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen || photos.length === 0) return;
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'ArrowRight') setCurrentIndex((prev) => (prev + 1) % photos.length);
+      if (e.key === 'ArrowLeft') {
+        setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentIndex, photos.length]);
+  }, [isOpen, onClose, photos.length]);
 
   if (!isOpen || photos.length === 0) return null;
 

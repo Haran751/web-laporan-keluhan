@@ -1,6 +1,6 @@
-# LAPORAN AUDIT — SiPeKa (Pengaduan Kerusakan Barang Kantor)
+# LAPORAN AUDIT — PADUKA (Pengaduan Kerusakan Fasilitas Kantor)
 
-**Sistem:** SiPeKa — Sistem Pengaduan Kerusakan Barang Kantor
+**Sistem:** PADUKA — Pengaduan Kerusakan Fasilitas Kantor
 **Versi aplikasi:** `next@14.2.25` (Next.js 14 App Router) + React 18 + Tailwind 3
 **Tanggal audit:** 6 Oktober 2026
 **Lingkungan uji:** `http://localhost:3200` (build produksi `next start` terisolasi)

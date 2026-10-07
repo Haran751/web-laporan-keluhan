@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { ALLOWED_PHOTO_TYPES, MIN_PHOTO_COUNT, MAX_PHOTO_COUNT } from '@/lib/validations';
 import { validasiPegawai } from '@/lib/pegawai';
+import { todayJakartaISO } from '@/lib/utils';
 
 interface PhotoItem {
   id: string;
@@ -53,6 +54,7 @@ export default function LaporPage() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
   const [photoWarning, setPhotoWarning] = useState<string | null>(null);
@@ -76,10 +78,9 @@ export default function LaporPage() {
   const deskripsiRef = useRef<HTMLTextAreaElement>(null);
   const photosSectionRef = useRef<HTMLDivElement>(null);
 
-  // Set default date to today
+  // Set default date to today (dalam zona waktu Asia/Jakarta agar tidak meleset 1 hari menjelang tengah malam)
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    setTanggalKeluhan(today);
+    setTanggalKeluhan(todayJakartaISO());
   }, []);
 
   // Verifikasi identitas pelapor terhadap master data pegawai resmi
@@ -214,6 +215,31 @@ export default function LaporPage() {
       }
       return prev.filter((p) => p.id !== id);
     });
+  };
+
+  // Drag & Drop: tampilkan efek visual saat berkas diseret di atas area upload
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFiles(e.dataTransfer.files);
+  };
+
+  // Akses keyboard: Enter / Spasi membuka pemilih berkas
+  const handleDropzoneKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
   };
 
   // Form Validation Check — seluruh kolom wajib terpenuhi sebelum laporan dapat dikirim.
@@ -780,8 +806,19 @@ export default function LaporPage() {
 
           {/* Area Drop Zone Upload */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Pilih atau tarik berkas foto ke sini"
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-300 hover:border-kemenkes-600 hover:bg-slate-50/60 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all"
+            onKeyDown={handleDropzoneKeyDown}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all outline-none focus-visible:ring-2 focus-visible:ring-kemenkes-500 ${
+              isDragOver
+                ? 'border-kemenkes-600 bg-kemenkes-50 scale-[1.01]'
+                : 'border-slate-300 hover:border-kemenkes-600 hover:bg-slate-50/60'
+            }`}
           >
             <input
               ref={fileInputRef}

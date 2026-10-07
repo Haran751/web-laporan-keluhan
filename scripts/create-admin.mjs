@@ -50,7 +50,7 @@ const email = args[0] || 'admin@kemenkes.go.id';
 const password = args[1] || 'AdminKemenkes123!';
 
 async function createAdmin() {
-  console.log('\n🚀 Memulai inisialisasi akun admin SiPeKa...');
+  console.log('\n🚀 Memulai inisialisasi akun admin PADUKA...');
   console.log(`📌 Target Email: ${email}`);
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {

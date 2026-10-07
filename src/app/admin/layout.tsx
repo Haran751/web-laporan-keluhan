@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Admin Top Navigation Bar */}
       <header className="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-18 py-3">
+          <div className="flex items-center justify-between min-h-[4.5rem] py-3">
             {/* Logo Admin */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-kemenkes-900 border border-kemenkes-500/40 flex items-center justify-center text-kemenkes-400">
@@ -119,6 +119,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
+              aria-expanded={mobileMenuOpen}
               className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { updateComplaintSchema } from '@/lib/validations';
+import { todayJakartaISO } from '@/lib/utils';
 
 // Helper: Verifikasi apakah request dikirim oleh admin terautentikasi
 async function verifyAdminSession() {
@@ -118,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Logika Otomatis:
     // Jika status diubah ke 'selesai' dan tanggal_selesai kosong, isi dengan tanggal hari ini
     if (status === 'selesai' && (!tanggal_selesai || tanggal_selesai === '')) {
-      tanggal_selesai = new Date().toISOString().split('T')[0];
+      tanggal_selesai = todayJakartaISO();
     } else if (status !== 'selesai' && (!tanggal_selesai || tanggal_selesai === '')) {
       tanggal_selesai = null;
     }
